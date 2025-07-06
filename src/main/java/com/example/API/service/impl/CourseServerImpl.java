@@ -2,11 +2,16 @@ package com.example.API.service.impl;
 
 import com.example.API.domain.Course;
 import com.example.API.dto.CourseResponse;
+import com.example.API.dto.CreateCourseRequest;
 import com.example.API.repository.CourseRepository;
 import com.example.API.service.CourseService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
+
 import java.util.List;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -81,5 +86,53 @@ public class CourseServerImpl implements CourseService {
                         .status(course.getStatus())
                         .build())
                 .orElse(null);
+    }
+
+    @Override
+    public void deleteCourseByCode(String code) {
+        List<Course> courses = courseRepository.getCourses();
+
+        boolean isRemoved = courses.removeIf(course -> course.getCode().equalsIgnoreCase(code));
+
+        if (!isRemoved) {
+            throw new ResponseStatusException(
+                    HttpStatus.NOT_FOUND,
+                    "Course code doesn't exist"
+            );
+        }
+    }
+
+    @Override
+    public CourseResponse createCourse(CreateCourseRequest createCourseRequest) {
+
+        // Validate course code
+        boolean isCourseCodeExisted = courseRepository.getCourses()
+                .stream()
+                .anyMatch(course ->course.getCode().equals(createCourseRequest.code()));
+        if (isCourseCodeExisted) {
+            // conflict
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "Course code already exists"
+            );
+        }
+        // Map dto to domain model
+        Course course = Course.builder()
+                .id(UUID.randomUUID().toString())
+                .code(createCourseRequest.code())
+                .title(createCourseRequest.title())
+                .price(createCourseRequest.price())
+                .status(false) // business logic
+                .build();
+
+        courseRepository.getCourses().add(course);
+
+        // Return : Map from domain model to dto
+        return CourseResponse.builder()
+                .code(course.getCode())
+                .title(course.getTitle())
+                .price(course.getPrice())
+                .status(course.getStatus())
+                .build();
     }
 }
